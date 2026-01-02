@@ -1,7 +1,0 @@
-Shipper(shipperId,name,address,phonenumber,account)
-Shipment(shipmentID,pickuptimestamp,price,paymentStaus,packageID,shipperID,customerID,paytype)
-Customer(customerID,name,address,phonenumber)
-Service(packageType,weight,promisedDeliveryTime,serviceType)
-Package(packageID,contentDescription,value,hazzardousMaterial,status,packageType,weight,promisedDeliveryTime)
-LocationHistory(packageID,timestamp,locationID,locationType)
-Location(locationID,locationType)
