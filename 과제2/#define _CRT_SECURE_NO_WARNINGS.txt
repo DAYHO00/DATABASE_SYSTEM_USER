@@ -1,0 +1,390 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include "mysql.h"
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <iomanip>
+
+#pragma comment(lib, "libmysql.lib")
+
+const char* host = "localhost";
+const char* user = "root";
+const char* pw = "wdhwswkes12!";  // MySQL 비밀번호 입력
+const char* db = "project";
+
+using namespace std;
+
+vector<string> dropCommands;
+
+// MySQL 연결 및 설정
+MYSQL* connectDatabase() {
+    MYSQL* connection = mysql_init(NULL);
+    if (connection == NULL) {
+        printf("mysql_init() error!");
+        return NULL;
+    }
+    connection = mysql_real_connect(connection, host, user, pw, NULL, 3306, NULL, 0);
+    if (connection == NULL) {
+        printf("%d ERROR : %s\n", mysql_errno(connection), mysql_error(connection));
+    }
+    return connection;
+}
+
+// CRUD 파일 처리 함수
+void processCrudFile(MYSQL* connection, const char* filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        printf("Cannot open CRUD file.\n");
+        return;
+    }
+    string line;
+    bool isDropSection = false;
+
+    while (getline(file, line)) {
+        if (line.find("DROP TABLE IF EXISTS") != string::npos) {
+            isDropSection = true;
+            dropCommands.push_back(line);
+            continue;
+        }
+
+        if (!isDropSection) {
+            if (!line.empty()) {
+                if (mysql_query(connection, line.c_str())) {
+                    printf("Query Error: %s\n", mysql_error(connection));
+                    printf("Query: %s\n", line.c_str());
+                }
+            }
+        }
+    }
+    file.close();
+}
+
+// 쿼리 수행 함수
+void executeQuery(MYSQL* connection, const string& query, bool printHeader) {
+    if (mysql_query(connection, query.c_str())) {
+        cerr << "Query Error: " << mysql_error(connection) << '\n';
+        return;
+    }
+    MYSQL_RES* res = mysql_store_result(connection);
+    if (res) {
+        MYSQL_ROW row;
+        unsigned int num_fields = mysql_num_fields(res);
+        MYSQL_FIELD* fields = mysql_fetch_fields(res);
+
+        if (printHeader) {
+            for (unsigned int i = 0; i < num_fields; i++) {
+                cout << left << setw(32) << ("[" + string(fields[i].name) + "]");
+            }
+            cout << '\n';
+        }
+
+        while ((row = mysql_fetch_row(res))) {
+            for (unsigned int i = 0; i < num_fields; i++) {
+                cout << left << setw(32) << (row[i] ? row[i] : "NULL");
+            }
+            cout << '\n';
+        }
+        mysql_free_result(res);
+    }
+}
+
+// TYPE 1 쿼리 함수
+void type1Queries(MYSQL* connection) {
+    string query;
+    query = "SELECT property_address FROM property WHERE property_address LIKE '%Mapo%';";
+    executeQuery(connection, query, true);
+
+    int choice;
+    while (true) {
+        cout << "\n------- Subtypes in TYPE 1 -------\n";
+        cout << "       1. TYPE 1-1\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+        case 1:
+            query = "SELECT property_address FROM property WHERE property_cost BETWEEN 1000000000 AND 1500000000 AND property_address LIKE '%Mapo%';";
+            executeQuery(connection, query, true);
+            return;
+        default:
+            cout << "Invalid choice. Try again.\n";
+        }
+    }
+}
+
+// TYPE 2 쿼리 함수
+void type2Queries(MYSQL* connection) {
+    string query;
+    query = "SELECT property_address FROM property WHERE school_district_number = 8;";
+    executeQuery(connection, query, true);
+
+    int choice;
+    while (true) {
+        cout << "\n------- Subtypes in TYPE 2 -------\n";
+        cout << "       1. TYPE 2-1\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+        case 1:
+            query = "SELECT property_address FROM property WHERE property_address LIKE '%Seoul Jongno%';";
+            executeQuery(connection, query, true);
+            return;
+        default:
+            cout << "Invalid choice. Try again.\n";
+        }
+    }
+}
+
+void type3Queries(MYSQL* connection) {
+    string query;
+    query = "SELECT a.agent_name FROM agent a JOIN deal d ON a.agent_id = d.agent_id JOIN sales s ON d.property_id = s.property_id WHERE YEAR(s.sale_date) = 2022 GROUP BY a.agent_id ORDER BY SUM(s.sale_price) DESC LIMIT 1;";
+    executeQuery(connection, query, true);
+
+    int choice;
+    while (true) {
+        cout << "\n------- Subtypes in TYPE 3 -------\n";
+        cout << "       1. TYPE 3-1\n";
+        cout << "       2. TYPE 3-2\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+        case 1: {
+            int k;
+            cout << "Enter value for k: ";
+            cin >> k;
+            query = "SELECT a.agent_name FROM agent a JOIN deal d ON a.agent_id = d.agent_id JOIN sales s ON d.property_id = s.property_id WHERE YEAR(s.sale_date) = 2023 GROUP BY a.agent_id ORDER BY SUM(s.sale_price) DESC LIMIT " + to_string(k) + ";";
+            executeQuery(connection, query, true);
+            break;
+        }
+        case 2: {
+            // 하위 10% 에이전트 수를 계산
+            query = "SELECT COUNT(DISTINCT a.agent_id) * 0.1 FROM agent a JOIN deal d ON a.agent_id = d.agent_id JOIN sales s ON d.property_id = s.property_id WHERE YEAR(s.sale_date) = 2021;";
+            if (mysql_query(connection, query.c_str())) {
+                cerr << "Query Error: " << mysql_error(connection) << '\n';
+                return;
+            }
+            MYSQL_RES* res = mysql_store_result(connection);
+            MYSQL_ROW row = mysql_fetch_row(res);
+            int limit = stoi(row[0]);
+            mysql_free_result(res);
+
+            // 하위 10% 에이전트를 조회하는 쿼리
+            query = "SELECT a.agent_name FROM agent a JOIN deal d ON a.agent_id = d.agent_id JOIN sales s ON d.property_id = s.property_id WHERE YEAR(s.sale_date) = 2021 GROUP BY a.agent_id ORDER BY SUM(s.sale_price) ASC LIMIT " + to_string(limit) + ";";
+            executeQuery(connection, query, true);
+            return;
+        }
+        default:
+            cout << "Invalid choice. Try again.\n";
+        }
+    }
+}
+
+
+
+
+// TYPE 4 쿼리 함수
+void type4Queries(MYSQL* connection) {
+    string query;
+    query = "SELECT a.agent_name, AVG(s.sale_price) AS AvgSalePrice, AVG(DATEDIFF(p.end_time, s.sale_date)) AS AvgMarketTime FROM agent a JOIN deal d ON a.agent_id = d.agent_id JOIN property p ON d.property_id = p.property_id JOIN sales s ON p.property_id = s.property_id WHERE YEAR(s.sale_date) = 2022 GROUP BY a.agent_id;";
+    executeQuery(connection, query, true);
+
+    int choice;
+    while (true) {
+        cout << "\n------- Subtypes in TYPE 4 -------\n";
+        cout << "       1. TYPE 4-1\n";
+        cout << "       2. TYPE 4-2\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+        case 1:
+            query = "SELECT a.agent_name, MAX(s.sale_price) AS MaxSalePrice FROM agent a JOIN deal d ON a.agent_id = d.agent_id JOIN property p ON d.property_id = p.property_id JOIN sales s ON p.property_id = s.property_id WHERE YEAR(s.sale_date) = 2023 GROUP BY a.agent_id;";
+            executeQuery(connection, query, true);
+            break;
+        case 2:
+            query = "SELECT a.agent_name, MAX(DATEDIFF(p.end_time, s.sale_date)) AS LongestMarketTime FROM agent a JOIN deal d ON a.agent_id = d.agent_id JOIN property p ON d.property_id = p.property_id JOIN sales s ON p.property_id = s.property_id GROUP BY a.agent_id;";
+            executeQuery(connection, query, true);
+            return;
+        default:
+            cout << "Invalid choice. Try again.\n";
+        }
+    }
+}
+
+// TYPE 5 쿼리 함수
+void type5Queries(MYSQL* connection) {
+    string query;
+
+    query = "SELECT ph.photo_id, p.property_id, p.floor_plan_number, ph.interior_photo FROM photo ph JOIN property p ON ph.property_id = p.property_id WHERE p.floor_plan_number = 'studio' ORDER BY p.property_cost DESC LIMIT 1;";
+    executeQuery(connection, query, true);
+
+    query = "SELECT ph.photo_id, p.property_id, p.floor_plan_number, ph.interior_photo FROM photo ph JOIN property p ON ph.property_id = p.property_id WHERE p.floor_plan_number = 'one-bedroom' ORDER BY p.property_cost DESC LIMIT 1;";
+    executeQuery(connection, query, false);
+
+    query = "SELECT ph.photo_id, p.property_id, p.floor_plan_number, ph.interior_photo FROM photo ph JOIN property p ON ph.property_id = p.property_id WHERE p.floor_plan_number = 'multi-bedroom' ORDER BY p.property_cost DESC LIMIT 1;";
+    executeQuery(connection, query, false);
+
+    query = "SELECT ph.photo_id, p.property_id, p.floor_plan_number, ph.interior_photo FROM photo ph JOIN property p ON ph.property_id = p.property_id WHERE p.floor_plan_number = 'detached' ORDER BY p.property_cost DESC LIMIT 1;";
+    executeQuery(connection, query, false);
+}
+
+// TYPE 6 쿼리 함수
+void type6Queries(MYSQL* connection) {
+    cout << "\nTYPE 6 - Record a sale:\n";
+    string saleID, propertyID, salePrice, saleDate, buyerID, agentID;
+    cout << "Enter SaleID: ";
+    cin >> saleID;
+    cout << "Enter PropertyID: ";
+    cin >> propertyID;
+    cout << "Enter SalePrice: ";
+    cin >> salePrice;
+    cout << "Enter SaleDate (YYYY-MM-DD): ";
+    cin >> saleDate;
+    cout << "Enter BuyerID: ";
+    cin >> buyerID;
+    cout << "Enter AgentID: ";
+    cin >> agentID;
+    string query = "INSERT INTO sales (sale_id, property_id, sale_price, sale_date, buyer_id, agent_id) VALUES ('" + saleID + "', '" + propertyID + "', '" + salePrice + "', '" + saleDate + "', '" + buyerID + "', '" + agentID + "');";
+    executeQuery(connection, query, true);
+}
+
+// TYPE 7 쿼리 함수
+void type7Queries(MYSQL* connection) {
+    cout << "\nTYPE 7 - Add a new agent:\n";
+    string agentID, agentName, phoneNumber;
+    cout << "Enter AgentID: ";
+    cin >> agentID;
+    cout << "Enter AgentName: ";
+    cin.ignore();  // 버퍼 비우기
+    getline(cin, agentName);
+    cout << "Enter PhoneNumber: ";
+    cin >> phoneNumber;
+    string query = "INSERT INTO agent (agent_id, agent_name, agent_phone_number) VALUES ('" + agentID + "', '" + agentName + "', '" + phoneNumber + "');";
+    executeQuery(connection, query, true);
+}
+
+// 메인 메뉴 제공 함수
+void queryMenu(MYSQL* connection) {
+    int choice;
+    while (true) {
+        cout << "\n---------- SELECT QUERY TYPES ----------\n\n";
+        cout << "           1. TYPE 1\n";
+        cout << "           2. TYPE 2\n";
+        cout << "           3. TYPE 3\n";
+        cout << "           4. TYPE 4\n";
+        cout << "           5. TYPE 5\n";
+        cout << "           6. TYPE 6\n";
+        cout << "           7. TYPE 7\n";
+        cout << "           0. Exit\n\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+        case 1:
+            type1Queries(connection);
+            break;
+        case 2:
+            type2Queries(connection);
+            break;
+        case 3:
+            type3Queries(connection);
+            break;
+        case 4:
+            type4Queries(connection);
+            break;
+        case 5:
+            type5Queries(connection);
+            break;
+        case 6:
+            type6Queries(connection);
+            break;
+        case 7:
+            type7Queries(connection);
+            break;
+        case 0:
+            for (const string& dropCommand : dropCommands) {
+                if (mysql_query(connection, dropCommand.c_str())) {
+                    printf("Query Error: %s\n", mysql_error(connection));
+                    printf("Query: %s\n", dropCommand.c_str());
+                }
+            }
+            return;
+        default:
+            cout << "Invalid choice. Try again.\n";
+        }
+    }
+}
+
+// 메인 함수
+int main(void) {
+    MYSQL* connection = connectDatabase();
+    if (connection == NULL) {
+        printf("Database connection failed.\n");
+        return 1;
+    }
+
+    // 데이터베이스 및 테이블 생성, 데이터 삽입을 위해 CRUD 파일 처리
+    processCrudFile(connection, "CRUD.txt");
+
+    // CRUD 파일 처리 후 데이터베이스를 선택
+    if (mysql_select_db(connection, db)) {
+        printf("%d ERROR : %s\n", mysql_errno(connection), mysql_error(connection));
+        return 1;
+    }
+
+    queryMenu(connection);
+
+    mysql_close(connection);
+    return 0;
+}
+
+CREATE DATABASE project; 
+USE project;
+CREATE TABLE seller (seller_id VARCHAR(20) NOT NULL, seller_name VARCHAR(20) NULL, seller_phone_number VARCHAR(20) NULL, PRIMARY KEY (seller_id)); 
+CREATE TABLE buyer (buyer_id VARCHAR(20) NOT NULL, buyer_name VARCHAR(20) NULL, buyer_phone_number VARCHAR(20) NULL, PRIMARY KEY (buyer_id)); 
+CREATE TABLE agent (agent_id VARCHAR(20) NOT NULL, agent_name VARCHAR(20) NULL, agent_phone_number VARCHAR(20) NULL, PRIMARY KEY (agent_id)); 
+CREATE TABLE time_slot (time_slot_id VARCHAR(20) NOT NULL, start_time INT(20) NOT NULL, end_time INT(20) NOT NULL, PRIMARY KEY (time_slot_id)); 
+CREATE TABLE property (property_id VARCHAR(20) NOT NULL, time_slot_id VARCHAR(20) NOT NULL, property_cost INT(20) NULL, floor_plan_number VARCHAR(20) NULL, school_district_number INT(20) NULL, property_address VARCHAR(50) NULL, end_time DATE NULL, PRIMARY KEY (property_id), FOREIGN KEY (time_slot_id) REFERENCES time_slot(time_slot_id)); 
+CREATE TABLE room (room_id VARCHAR(20) NOT NULL, property_id VARCHAR(20) NOT NULL, room_floor INT(20) NULL, room_size INT(20) NULL, bedroom_number INT(20) NULL, bathroom_number INT(20) NULL, PRIMARY KEY (room_id), FOREIGN KEY (property_id) REFERENCES property(property_id)); 
+CREATE TABLE photo (photo_id VARCHAR(20) NOT NULL, property_id VARCHAR(20) NOT NULL, interior_photo VARCHAR(20) NOT NULL, exterior_photo VARCHAR(20) NOT NULL, PRIMARY KEY (photo_id), FOREIGN KEY (property_id) REFERENCES property(property_id)); 
+CREATE TABLE consider (property_id VARCHAR(20) NOT NULL, photo_id VARCHAR(20) NOT NULL, interior_photo VARCHAR(20) NOT NULL, exterior_photo VARCHAR(20) NOT NULL, PRIMARY KEY (property_id, photo_id), FOREIGN KEY (property_id) REFERENCES property(property_id), FOREIGN KEY (photo_id) REFERENCES photo(photo_id)); 
+CREATE TABLE `match` (room_id VARCHAR(20) NOT NULL, property_id VARCHAR(20) NOT NULL, PRIMARY KEY (room_id, property_id), FOREIGN KEY (room_id) REFERENCES room(room_id), FOREIGN KEY (property_id) REFERENCES property(property_id)); 
+CREATE TABLE deal (property_id VARCHAR(20) NOT NULL, agent_id VARCHAR(20) NOT NULL, PRIMARY KEY (property_id, agent_id), FOREIGN KEY (property_id) REFERENCES property(property_id), FOREIGN KEY (agent_id) REFERENCES agent(agent_id)); 
+CREATE TABLE sell (seller_id VARCHAR(20) NOT NULL, agent_id VARCHAR(20) NOT NULL, PRIMARY KEY (seller_id, agent_id), FOREIGN KEY (seller_id) REFERENCES seller(seller_id), FOREIGN KEY (agent_id) REFERENCES agent(agent_id)); 
+CREATE TABLE buy (buyer_id VARCHAR(20) NOT NULL, agent_id VARCHAR(20) NOT NULL, PRIMARY KEY (buyer_id, agent_id), FOREIGN KEY (buyer_id) REFERENCES buyer(buyer_id), FOREIGN KEY (agent_id) REFERENCES agent(agent_id)); 
+CREATE TABLE sales (sale_id VARCHAR(20) NOT NULL, property_id VARCHAR(20) NOT NULL, sale_price INT(20) NOT NULL, sale_date DATE NOT NULL, buyer_id VARCHAR(20) NOT NULL, agent_id VARCHAR(20) NOT NULL, PRIMARY KEY (sale_id), FOREIGN KEY (property_id) REFERENCES property(property_id), FOREIGN KEY (buyer_id) REFERENCES buyer(buyer_id), FOREIGN KEY (agent_id) REFERENCES agent(agent_id)); 
+INSERT INTO seller (seller_id, seller_name, seller_phone_number) VALUES ('S001', 'Grace Hopper', '010-1234-5678'), ('S002', 'Henry Ford', '010-2345-6789'), ('S003', 'Isaac Newton', '010-3456-7890'), ('S004', 'Jane Austen', '010-4567-8901'), ('S005', 'Ken Burns', '010-5678-9012'); 
+INSERT INTO buyer (buyer_id, buyer_name, buyer_phone_number) VALUES ('B001', 'David Johnson', '010-9876-5432'), ('B002', 'Eva Green', '010-8765-4321'), ('B003', 'Frank White', '010-7654-3210'), ('B004', 'George Harrison', '010-6543-2109'), ('B005', 'Helen Hunt', '010-5432-1098'); 
+INSERT INTO agent (agent_id, agent_name, agent_phone_number) VALUES ('A001', 'Alice Johnson', '010-1234-5678'), ('A002', 'Bob Smith', '010-2345-6789'), ('A003', 'Charlie Brown', '010-3456-7890'), ('A004', 'Diana Ross', '010-4567-8901'), ('A005', 'Edward King', '010-5678-9012'); 
+INSERT INTO time_slot (time_slot_id, start_time, end_time) VALUES ('T001', 800, 1200), ('T002', 1300, 1700), ('T003', 900, 1100); 
+INSERT INTO property (property_id, time_slot_id, property_cost, floor_plan_number, school_district_number, property_address, end_time) VALUES ('P001', 'T001', 1000000000, 'studio', 8, 'Seoul Mapo 123', '2023-05-01'), ('P002', 'T002', 600000, 'one-bedroom', 8, 'Seoul Gangnam 456', '2023-06-01'), ('P003', 'T003', 700000, 'multi-bedroom', 3, 'Seoul Yongsan 789', '2023-07-01'), ('P004', 'T001', 800000, 'detached', 8, 'Seoul Jongno 123', '2023-08-01'), ('P005', 'T002', 900000, 'detached', 5, 'Seoul Dongdaemun 456', '2023-09-01'); 
+INSERT INTO room (room_id, property_id, room_floor, room_size, bedroom_number, bathroom_number) VALUES ('R001', 'P001', 2, 1, 4, 2), ('R002', 'P002', 3, 2, 3, 2), ('R003', 'P003', 1, 1, 1, 1), ('R004', 'P004', 4, 3, 4, 3), ('R005', 'P005', 1, 1, 1, 1); 
+INSERT INTO photo (photo_id, property_id, interior_photo, exterior_photo) VALUES ('PH001', 'P001', 'Interior', 'Exterior'), ('PH002', 'P001', 'Exterior', 'Interior'), ('PH003', 'P002', 'Exterior', 'Floor Plan'), ('PH004', 'P003', 'Floor Plan', 'Exterior'), ('PH005', 'P003', 'Exterior', 'Interior'), ('PH006', 'P003', 'Interior', 'Exterior'), ('PH007', 'P004', 'Exterior', 'Interior'), ('PH008', 'P005', 'Interior', 'Exterior'), ('PH009', 'P005', 'Exterior', 'Interior'); 
+INSERT INTO consider (property_id, photo_id, interior_photo, exterior_photo) VALUES ('P001', 'PH001', 'Interior', 'Exterior'), ('P002', 'PH002', 'Exterior', 'Interior'), ('P003', 'PH003', 'Floor Plan', 'Interior'); 
+INSERT INTO `match` (room_id, property_id) VALUES ('R001', 'P001'), ('R002', 'P002'), ('R003', 'P003'); 
+INSERT INTO deal (property_id, agent_id) VALUES ('P001', 'A001'), ('P002', 'A002'), ('P003', 'A003'); 
+INSERT INTO sell (seller_id, agent_id) VALUES ('S001', 'A001'), ('S002', 'A002'), ('S003', 'A003'); 
+INSERT INTO buy (buyer_id, agent_id) VALUES ('B001', 'A001'), ('B002', 'A002'), ('B003', 'A003'); 
+INSERT INTO sales (sale_id, property_id, sale_price, sale_date, buyer_id, agent_id) VALUES ('SA001', 'P001', 950000000, '2023-01-10', 'B001', 'A001'), ('SA002', 'P002', 1150000000, '2021-02-15', 'B002', 'A002'), ('SA003', 'P003', 850000000, '2023-03-20', 'B003', 'A003'), ('SA004', 'P004', 800000000, '2021-04-25', 'B004', 'A004'), ('SA005', 'P005', 900000000, '2022-05-30', 'B005', 'A005'), ('SA006', 'P001', 650000000, '2021-06-10', 'B001', 'A001'), ('SA007', 'P002', 750000000, '2022-07-15', 'B002', 'A002'), ('SA008', 'P003', 950000000, '2021-08-20', 'B003', 'A003'), ('SA009', 'P004', 850000000, '2021-09-25', 'B004', 'A004'), ('SA010', 'P005', 780000000, '2021-10-30', 'B005', 'A005'), ('SA011', 'P001', 620000000, '2021-11-10', 'B001', 'A001'), ('SA012', 'P002', 710000000, '2021-12-15', 'B002', 'A002'), ('SA013', 'P003', 820000000, '2021-12-20', 'B003', 'A003'), ('SA014', 'P004', 930000000, '2021-11-25', 'B004', 'A004'), ('SA015', 'P005', 890000000, '2021-10-30', 'B005', 'A005'); 
+SET FOREIGN_KEY_CHECKS = 0; 
+DROP TABLE IF EXISTS sales; 
+DROP TABLE IF EXISTS deal; 
+DROP TABLE IF EXISTS `match`; 
+DROP TABLE IF EXISTS consider; 
+DROP TABLE IF EXISTS photo; 
+DROP TABLE IF EXISTS room; 
+DROP TABLE IF EXISTS property; 
+DROP TABLE IF EXISTS agent; 
+DROP TABLE IF EXISTS buy; 
+DROP TABLE IF EXISTS sell; 
+DROP TABLE IF EXISTS time_slot; 
+DROP TABLE IF EXISTS buyer; 
+DROP TABLE IF EXISTS seller; 
+SET FOREIGN_KEY_CHECKS = 1; 
+DROP DATABASE IF EXISTS project;
+

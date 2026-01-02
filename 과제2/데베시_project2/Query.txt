@@ -1,0 +1,38 @@
+Query
+
+update Shipment set DeliveryTimestamp is null where PackageID in (select CustomerID from Shipment S natural join locationhistory L where LocationID = "1721");
+
+I
+-1 select CustomerID from Shipment S natural join locationhistory L where LocationID = "1721" and S.DeliveryTimestamp is null;
+
+-2 select ShipperID from Shipment S natural join locationhistory L where LocationID = "1721" and S.DeliveryTimestamp is null;
+
+-3 select C.CustomerID,C.name,C.address  from Customer C natural join Shipment S where S.DeliveryTimestamp = (select max(DeliveryTimestamp) from Shipment S natural join locationhistory L where LocationID = "1721");
+
+
+II
+
+with VIP(ShipperID, cnt) as (select ShipperID, count(PackageID) as cnt from ((Package natural join Service) natural join Tariff) natural join Shipment S where year(S.DeliveryTimestamp) = "2021" group by ShipperID) select ShipperID, cnt from VIP V where V.cnt >= all(select cnt from VIP);
+
+
+III
+
+with VIP(ShipperID, total) as (select ShipperID, sum(Fee) as total from ((Package natural join Service) natural join Tariff) natural join Shipment S where year(S.DeliveryTimestamp) = "2021" group by ShipperID) select ShipperID, total from VIP V where V.total >= all(select total from VIP);
+
+
+IV
+
+select ShipmentID ,PackageID from Shipment natural join package where ((PromisedDeliveryTime = "overnight" and (day(PickupTimestamp) + 1 < day(DeliveryTimestamp))) or (PromisedDeliveryTime = "second day" and (day(PickupTimestamp) + 2 < day(DeliveryTimestamp))) or (PromisedDeliveryTime = "larger" and (day(PickupTimestamp) + 3 < day(DeliveryTimestamp))));
+
+
+V
+/*simple*/
+select ShipperID, A.address, sum(Fee) from (((Package natural join Service) natural join Tariff) natural join Shipment S) natural join Shipper A where year(S.DeliveryTimestamp) = "2021" and month(S.DeliveryTimestamp) = "3" group by ShipperID, A.address;
+
+/*listing*/
+select ShipperID, A.address, servicetype, sum(Fee) from (((Package natural join Service) natural join Tariff) natural join Shipment S) natural join Shipper A where year(S.DeliveryTimestamp) = "2021" and month(S.DeliveryTimestamp) = "3" group by ShipperID, servicetype, A.address;
+
+
+
+/*itemizing*/
+select ShipperID, ShipmentID, A.address, Fee from (((Package natural join Service) natural join Tariff) natural join Shipment S) natural join Shipper A where year(S.DeliveryTimestamp) = "2021" and month(S.DeliveryTimestamp) = "3";

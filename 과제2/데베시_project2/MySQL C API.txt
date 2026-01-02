@@ -1,0 +1,19 @@
+mysql_query : mysql에 쿼리를 보냄, 성공하면 0리턴
+ex)	 query = "select * from table";
+	result = mysql_query(query);	
+mysql_real_connect : MySQL서버 연결
+mysql_init() : MySQL구조를 획득하거나 초기화
+mysql_error : 최근 호출된 함수의 에러 메세지 리턴
+mysql_errno : 최근 호출된 함수의 에러 숫자 리턴
+mysql_select_db : mysql_connect 함수로 MySQL접속후 데이터베이스 선택
+ex) 	mysql_select_db(데이터베이스 이름, 링크 식별자)
+mysql_store_result : 클라이언트로 완벽한 결과 셋을 검색
+mysql_fetch_row : 결과 셋에서 다음 로우를 호출
+mysql_free_result : 결과 셋이 사용한 메모리 제거
+
+
+https://devanix.tistory.com/207
+
+github 데베시 완성
+https://github.com/daminzzi/CSE4110/blob/main/%5BDBproject2%5D20181297/20181297.cpp
+https://github.com/ozzing/Database-System/blob/main/project2.c
