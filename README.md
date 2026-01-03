@@ -38,9 +38,9 @@
 ---
 
 ## 🛠 기술 스택
-Modeling Tool : ERwin Data Modeler
-Language : C++
-Environment : Linux
+- Modeling Tool : ERwin Data Modeler
+- Language : C++
+- Environment : Linux
 
 
 ---
